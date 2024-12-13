@@ -1,7 +1,7 @@
+CORE = exports.zrx_utility:GetUtility()
 ---@diagnostic disable: missing-parameter, param-type-mismatch
 local isBusy = false
 local lastPressTime = 0
-local doubleClickThreshold = 0.3
 local singleClickScheduled = false
 
 RegisterCommand('+quick_ping', function()
@@ -11,16 +11,16 @@ RegisterCommand('+quick_ping', function()
 
     local currentTime = GetGameTimer() / 1000
 
-    if (currentTime - lastPressTime) <= doubleClickThreshold then
+    if (currentTime - lastPressTime) <= Config.DoubleClickTreshold then
         singleClickScheduled = false
 
-        HandlePing('⚠️')
+        HandlePing(Config.Icons.normal)
     else
         singleClickScheduled = true
 
-        SetTimeout(doubleClickThreshold * 1000, function()
+        SetTimeout(Config.DoubleClickTreshold * 1000, function()
             if singleClickScheduled then
-                HandlePing('📍')
+                HandlePing(Config.Icons.warning)
             end
         end)
     end
@@ -28,12 +28,11 @@ RegisterCommand('+quick_ping', function()
     lastPressTime = currentTime
 end)
 
-RegisterCommand('-quick_ping', function()
-end)
-RegisterKeyMapping('+quick_ping', Strings.place_desc, 'MOUSE_BUTTON', 'MOUSE_MIDDLE')
+RegisterCommand('-quick_ping', function() end)
+RegisterKeyMapping('+quick_ping', Strings.place_desc, Config.Activation.mapping, Config.Activation.key)
 
 HandlePing = function(icon)
-    local _, entity, endCoords = lib.raycast.fromCamera(511, 4, 1000.0)
+    local _, entity, endCoords = lib.raycast.fromCamera(511, 4, 10000)
     local netId
 
     if endCoords.x == 0.0 or endCoords.y == 0.0 or endCoords.z  == 0.0 then
@@ -50,43 +49,13 @@ HandlePing = function(icon)
 end
 
 RegisterNetEvent('wrp_quickping:client:receivePing', function(data)
-    PlaceTemporaryMarker(data.coords, data.duration, data.color, data.pid, data.name, data.blipColor, data.entity, data.icon)
+    PlaceTemporaryMarker(data.coords, data.duration, data.pid, data.name, data.blipColor, data.entity, data.icon)
 end)
 
-DrawText3D = function(x, y, z, text, r, g, b, scale)
-    SetDrawOrigin(x, y, z, 0)
-    SetTextFont(0)
-    SetTextProportional(0)
-    SetTextScale(0, scale or 0.2)
-    SetTextColour(r, g, b, 255)
-    SetTextDropshadow(0, 0, 0, 0, 255)
-    SetTextEdge(2, 0, 0, 0, 150)
-    SetTextDropShadow()
-    SetTextOutline()
-    SetTextEntry('STRING')
-    SetTextCentre(true)
-    AddTextComponentString(text)
-    DrawText(0, 0)
-    ClearDrawOrigin()
-end
-
-CreateBlip = function(coords, sprite, color, scale, text)
-    local blip = AddBlipForCoord(coords.x, coords.y, coords.z)
-
-    SetBlipSprite(blip, sprite)
-    SetBlipColour(blip, color)
-    SetBlipScale(blip, scale)
-    BeginTextCommandSetBlipName("STRING")
-    AddTextComponentString(text)
-    EndTextCommandSetBlipName(blip)
-
-    return blip
-end
-
-PlaceTemporaryMarker = function(coords, duration, color, pid, name, blipColor, netId, icon)
+PlaceTemporaryMarker = function(coords, duration, pid, name, blipColor, netId, icon)
     CreateThread(function()
         local endTime = GetGameTimer() + duration
-        local blip = CreateBlip(coords, 12, blipColor, 1.0, Strings.display_text:format(pid, name))
+        local blip = CORE.Client.CreateBlip(coords, 12, blipColor, 1.0, Strings.display_text:format(pid, name))
         local distance, entity
         local id = Config.UseUniqueID and exports.zrx_uniqueid:GetPlayerUIDfromSID(pid) or pid
 
@@ -101,10 +70,9 @@ PlaceTemporaryMarker = function(coords, duration, color, pid, name, blipColor, n
 
             distance = #(GetEntityCoords(cache.ped) - coords)
 
-            --DrawMarker(1, coords.x, coords.y, coords.z, nil, nil, nil, nil, nil, nil, 1.0, 1.0, 10000.0, color.r, color.g, color.b, color.a, false, true, 2, false, nil, nil, nil)
-            DrawText3D(coords.x, coords.y, coords.z+8.0, Strings.display_text:format(id, name), 255, 255, 255, 0.2)
-            DrawText3D(coords.x, coords.y, coords.z+5.0, Strings.display_text_meter:format(Round(distance, 0)), 255, 255, 255, 0.15)
-            DrawText3D(coords.x, coords.y, coords.z+0.5, icon, 255, 255, 255, 0.3)
+            CORE.Client.DrawText3D(coords.x, coords.y, coords.z+8.0, Strings.display_text:format(id, name), 255, 255, 255, 0.2)
+            CORE.Client.DrawText3D(coords.x, coords.y, coords.z+5.0, Strings.display_text_meter:format(math.round(distance, 0)), 255, 255, 255, 0.15)
+            CORE.Client.DrawText3D(coords.x, coords.y, coords.z+0.5, icon, 255, 255, 255, 0.3)
 
             Wait(0)
         end
@@ -112,8 +80,4 @@ PlaceTemporaryMarker = function(coords, duration, color, pid, name, blipColor, n
         RemoveBlip(blip)
         isBusy = false
     end)
-end
-
-Round = function(num, decimalPlaces)
-    return tonumber(string.format("%." .. (decimalPlaces or 0) .. "f", num))
 end
